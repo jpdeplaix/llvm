@@ -17,4 +17,9 @@ ocamldoc:
 		$(MAKE) -C $$i ocamldoc; \
 	done
 
+build:
+	$(Verb) for i in $(DIRS) ; do \
+		$(MAKE) -C $$i all-local; \
+	done
+
 include $(LEVEL)/Makefile.common
