@@ -31,6 +31,7 @@ include $(LEVEL)/Makefile.common
 
 ifdef SYSTEM_LLVM_CONFIG
 LLVM_CONFIG = $(SYSTEM_LLVM_CONFIG)
+LLVMLibsOptions += $(shell $(LLVM_CONFIG) --ldflags)
 endif
 
 # Intentionally ignore PROJ_prefix here. We want the ocaml stdlib. However, the
