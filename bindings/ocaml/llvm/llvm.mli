@@ -134,32 +134,138 @@ end
     See [llvm::Attribute::AttrKind]. *)
 module Attribute : sig
   type t =
-  | Zext
-  | Sext
-  | Noreturn
-  | Inreg
-  | Structret
-  | Nounwind
-  | Noalias
-  | Byval
-  | Nest
-  | Readnone
-  | Readonly
-  | Noinline
-  | Alwaysinline
-  | Optsize
-  | Ssp
-  | Sspreq
-  | Alignment of int
-  | Nocapture
-  | Noredzone
-  | Noimplicitfloat
-  | Naked
-  | Inlinehint
-  | Stackalignment of int
-  | ReturnsTwice
-  | UWTable
-  | NonLazyBind
+    | Alignment of int64
+    | Allocsize of int64 (* ??? *)
+    | Alwaysinline
+    | Builtin
+    | Byval
+    | Cold
+    | Convergent
+    | Dereferenceable of int64
+    | DereferenceableOrNull of int64
+    | Inaccessiblememonly
+    | InaccessiblememOrArgmemonly
+    | Inalloca
+    | Inlinehint
+    | Inreg
+    | Jumptable
+    | Minsize
+    | Naked
+    | Nest
+    | Noalias
+    | Nobuiltin
+    | Nocapture
+    | Noduplicate
+    | Noimplicitfloat
+    | Noinline
+    | NonLazyBind
+    | Nonnull
+    | Norecurse
+    | Noredzone
+    | Noreturn
+    | Nounwind
+    | Optsize
+    | Optnone
+    | Readnone
+    | Readonly
+    | Returned
+    | ReturnsTwice
+    | Safestack
+    | Sext
+    | Stackalignment of int64
+    | Ssp
+    | Sspreq
+    | Sspstrong
+    | Structret
+    | SanitizeAddress
+    | SanitizeThread
+    | SanitizeMemory
+    | Swifterror
+    | Swiftself
+    | UWTable
+    | Writeonly
+    | Zext
+
+    | LessPreciseFpmad of string
+    | NoInfsFpMath of string
+    | NoNansFpMath of string
+    | UnsafeFpMath of string
+    | NoJumpTables of string
+
+    | Enum_attr of (string * int64)
+    | String_attr of (string * string)
+
+  type value =
+    [ `Unit
+    | `Int of int64
+    | `String of string
+    ]
+
+  val binding : t -> (string * value)
+(*
+  type t
+
+  val align : int64 -> t
+  val allocsize : int64 -> t (* ??? *)
+  val alwaysinline : t
+  val builtin : t
+  val byval : t
+  val cold : t
+  val convergent : t
+  val dereferenceable : int64 -> t
+  val dereferenceable_or_null : int64 -> t
+  val inaccessiblememonly : t
+  val inaccessiblemem_or_argmemonly : t
+  val inalloca : t
+  val inlinehint : t
+  val inreg : t
+  val jumptable : t
+  val minsize : t
+  val naked : t
+  val nest : t
+  val noalias : t
+  val nobuiltin : t
+  val nocapture : t
+  val noduplicate : t
+  val noimplicitfloat : t
+  val noinline : t
+  val nonlazybind : t
+  val nonnull : t
+  val norecurse : t
+  val noredzone : t
+  val noreturn : t
+  val nounwind : t
+  val optsize : t
+  val optnone : t
+  val readnone : t
+  val readonly : t
+  val returned : t
+  val returns_twice : t
+  val safestack : t
+  val signext : t
+  val alignstack : int64 -> t
+  val ssp : t
+  val sspreq : t
+  val sspstrong : t
+  val sret : t
+  val sanitize_address : t
+  val sanitize_thread : t
+  val sanitize_memory : t
+  val swifterror : t
+  val swiftself : t
+  val uwtable : t
+  val writeonly : t
+  val zeroext : t
+
+  val less_precise_fpmad : string -> t
+  val no_infs_fp_math : string -> t
+  val no_nans_fp_math : string -> t
+  val unsafe_fp_math : string -> t
+  val no_jump_tables : string -> t
+
+  val enum_attr : string -> int64 -> t
+  val string_attr : string -> string -> t
+*)
 end
 
 (** The predicate for an integer comparison ([icmp]) instruction.
@@ -1547,21 +1653,17 @@ val gc : llvalue -> string option
     [gc]. See the method [llvm::Function::setGC]. *)
 val set_gc : string option -> llvalue -> unit
 
-(** [add_function_attr f a] adds attribute [a] to the return type of function
-    [f]. *)
-val add_function_attr : llvalue -> Attribute.t -> unit
-
-(** [add_target_dependent_function_attr f a] adds target-dependent attribute
-    [a] to function [f]. *)
-val add_target_dependent_function_attr : llvalue -> string -> string -> unit
+(** [add_function_attr f i a] adds attribute [a] at index [i] to the return type
+    of function [f]. *)
+val add_function_attr : llcontext -> llvalue -> int -> Attribute.t -> unit
 
 (** [function_attr f] returns the function attribute for the function [f].
     See the method [llvm::Function::getAttributes] *)
-val function_attr : llvalue -> Attribute.t list
+val function_attr : llvalue -> int -> Attribute.t array
 
 (** [remove_function_attr f a] removes attribute [a] from the return type of
     function [f]. *)
-val remove_function_attr : llvalue -> Attribute.t -> unit
+val remove_function_attr : llvalue -> int -> Attribute.t -> unit
 
 
 (** {7 Operations on params} *)
@@ -1573,11 +1675,6 @@ val params : llvalue -> llvalue array
 (** [param f n] returns the [n]th parameter of function [f].
     See the method [llvm::Function::getArgumentList]. *)
 val param : llvalue -> int -> llvalue
-
-(** [param_attr p] returns the attributes of parameter [p].
-    See the methods [llvm::Function::getAttributes] and
-    [llvm::Attributes::getParamAttributes] *)
-val param_attr : llvalue -> Attribute.t list
 
 (** [param_parent p] returns the parent function that owns the parameter.
     See the method [llvm::Argument::getParent]. *)
@@ -1619,12 +1716,6 @@ val rev_iter_params : (llvalue -> unit) -> llvalue -> unit
 (** [fold_right_params f fn init] is [f (... (f init bN) ...) b1] where
     [b1,...,bN] are the parameters of function [fn]. Tail recursive. *)
 val fold_right_params : (llvalue -> 'a -> 'a) -> llvalue -> 'a -> 'a
-
-(** [add_param p a] adds attribute [a] to parameter [p]. *)
-val add_param_attr : llvalue -> Attribute.t -> unit
-
-(** [remove_param_attr p a] removes attribute [a] from parameter [p]. *)
-val remove_param_attr : llvalue -> Attribute.t -> unit
 
 (** [set_param_alignment p a] set the alignment of parameter [p] to [a]. *)
 val set_param_alignment : llvalue -> int -> unit
@@ -1800,12 +1891,15 @@ val set_instruction_call_conv: int -> llvalue -> unit
 (** [add_instruction_param_attr ci i a] adds attribute [a] to the [i]th
     parameter of the call or invoke instruction [ci]. [i]=0 denotes the return
     value. *)
-val add_instruction_param_attr : llvalue -> int -> Attribute.t -> unit
+val add_callsite_attr : llcontext -> llvalue -> int -> Attribute.t -> unit
+
+(** Blah *)
+val callsite_attr : llvalue -> int -> Attribute.t array
 
 (** [remove_instruction_param_attr ci i a] removes attribute [a] from the
     [i]th parameter of the call or invoke instruction [ci]. [i]=0 denotes the
     return value. *)
-val remove_instruction_param_attr : llvalue -> int -> Attribute.t -> unit
+val remove_callsite_attr : llvalue -> int -> Attribute.t -> unit
 
 
 (** {7 Operations on call instructions (only)} *)

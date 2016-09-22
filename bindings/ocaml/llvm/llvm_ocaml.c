@@ -1308,30 +1308,50 @@ CAMLprim value llvm_set_gc(value GC, LLVMValueRef Fn) {
   return Val_unit;
 }
 
-/* llvalue -> int32 -> unit */
-CAMLprim value llvm_add_function_attr(LLVMValueRef Arg, value PA) {
-  LLVMAddFunctionAttr(Arg, Int32_val(PA));
-  return Val_unit;
+/* string -> Attribute.llkind */
+CAMLprim unsigned llvm_get_enum_attribute_kind(value String) {
+    mlsize_t len = caml_string_length(String);
+    return LLVMGetEnumAttributeKindForName(String_val(String), len);
 }
 
-/* llvalue -> string -> string -> unit */
-CAMLprim value llvm_add_target_dependent_function_attr(
-                  LLVMValueRef Arg, value A, value V) {
-  LLVMAddTargetDependentFunctionAttr(Arg, String_val(A), String_val(V));
-  return Val_unit;
+/* llcontext -> Attribute.llkind -> int64 -> Attribute.llattr */
+CAMLprim LLVMAttributeRef llvm_create_enum_attribute(LLVMContextRef C, unsigned KindID, value Val) {
+    return LLVMCreateEnumAttribute(C, KindID, Int64_val(Val));
 }
 
-/* llvalue -> int32 */
-CAMLprim value llvm_function_attr(LLVMValueRef Fn)
-{
-    CAMLparam0();
-    CAMLreturn(caml_copy_int32(LLVMGetFunctionAttr(Fn)));
+/* llcontext -> string -> string -> Attribute.llattr */
+CAMLprim LLVMAttributeRef llvm_create_string_attribute(LLVMContextRef C, value K, value V) {
+    mlsize_t lenK = caml_string_length(K);
+    mlsize_t lenV = caml_string_length(V);
+    return LLVMCreateStringAttribute(C, String_val(K), lenK, String_val(V), lenV);
 }
 
-/* llvalue -> int32 -> unit */
-CAMLprim value llvm_remove_function_attr(LLVMValueRef Arg, value PA) {
-  LLVMRemoveFunctionAttr(Arg, Int32_val(PA));
-  return Val_unit;
+/* llvalue -> int -> Attribute.llattr -> unit */
+CAMLprim value llvm_add_function_attr(LLVMValueRef Arg, value Idx, LLVMAttributeRef Attr) {
+    LLVMAddAttributeAtIndex(Arg, Int_val(Idx), Attr);
+    return Val_unit;
+}
+
+/* llvalue -> int -> Attribute.llattr array */
+CAMLprim value llvm_function_attr(LLVMValueRef Fn, value Idx) {
+    CAMLparam1(Idx);
+    CAMLlocal1(Attrs);
+    Attrs = alloc(LLVMGetAttributeCountAtIndex(Fn, Int_val(Idx)), 0);
+    LLVMGetAttributesAtIndex(Fn, Int_val(Idx), (LLVMAttributeRef*)Op_val(Attrs));
+    CAMLreturn(Attrs);
+}
+
+/* llvalue -> int -> Attribute.llkind -> unit */
+CAMLprim value llvm_remove_enum_attr(LLVMValueRef Arg, value Idx, unsigned KindID) {
+    LLVMRemoveEnumAttributeAtIndex(Arg, Int_val(Idx), KindID);
+    return Val_unit;
+}
+
+/* llvalue -> int -> string -> unit */
+CAMLprim value llvm_remove_string_attr(LLVMValueRef Arg, value Idx, value Key) {
+    mlsize_t len = caml_string_length(Key);
+    LLVMRemoveStringAttributeAtIndex(Arg, Int_val(Idx), String_val(Key), len);
+    return Val_unit;
 }
 /*--... Operations on parameters ...........................................--*/
 
@@ -1342,30 +1362,11 @@ CAMLprim LLVMValueRef llvm_param(LLVMValueRef Fn, value Index) {
   return LLVMGetParam(Fn, Int_val(Index));
 }
 
-/* llvalue -> int */
-CAMLprim value llvm_param_attr(LLVMValueRef Param)
-{
-    CAMLparam0();
-    CAMLreturn(caml_copy_int32(LLVMGetAttribute(Param)));
-}
-
 /* llvalue -> llvalue */
 CAMLprim value llvm_params(LLVMValueRef Fn) {
   value Params = alloc(LLVMCountParams(Fn), 0);
   LLVMGetParams(Fn, (LLVMValueRef *) Op_val(Params));
   return Params;
-}
-
-/* llvalue -> int32 -> unit */
-CAMLprim value llvm_add_param_attr(LLVMValueRef Arg, value PA) {
-  LLVMAddAttribute(Arg, Int32_val(PA));
-  return Val_unit;
-}
-
-/* llvalue -> int32 -> unit */
-CAMLprim value llvm_remove_param_attr(LLVMValueRef Arg, value PA) {
-  LLVMRemoveAttribute(Arg, Int32_val(PA));
-  return Val_unit;
 }
 
 /* llvalue -> int -> unit */
@@ -1500,20 +1501,32 @@ CAMLprim value llvm_set_instruction_call_conv(value CC, LLVMValueRef Inst) {
   return Val_unit;
 }
 
-/* llvalue -> int -> int32 -> unit */
-CAMLprim value llvm_add_instruction_param_attr(LLVMValueRef Instr,
-                                               value index,
-                                               value PA) {
-  LLVMAddInstrAttribute(Instr, Int_val(index), Int32_val(PA));
-  return Val_unit;
+/* llvalue -> int -> Attribute.llattr -> unit */
+CAMLprim value llvm_add_callsite_attr(LLVMValueRef Arg, value Idx, LLVMAttributeRef Attr) {
+    LLVMAddCallSiteAttribute(Arg, Int_val(Idx), Attr);
+    return Val_unit;
 }
 
-/* llvalue -> int -> int32 -> unit */
-CAMLprim value llvm_remove_instruction_param_attr(LLVMValueRef Instr,
-                                                  value index,
-                                                  value PA) {
-  LLVMRemoveInstrAttribute(Instr, Int_val(index), Int32_val(PA));
-  return Val_unit;
+/* llvalue -> int -> Attribute.llattr array */
+CAMLprim value llvm_callsite_attr(LLVMValueRef Fn, value Idx) {
+    CAMLparam1(Idx);
+    CAMLlocal1(Attrs);
+    Attrs = alloc(LLVMGetCallSiteAttributeCount(Fn, Int_val(Idx)), 0);
+    LLVMGetCallSiteAttributes(Fn, Int_val(Idx), (LLVMAttributeRef*)Op_val(Attrs));
+    CAMLreturn(Attrs);
+}
+
+/* llvalue -> int -> Attribute.llkind -> unit */
+CAMLprim value llvm_remove_callsite_enum_attr(LLVMValueRef Arg, value Idx, unsigned KindID) {
+    LLVMRemoveCallSiteEnumAttribute(Arg, Int_val(Idx), KindID);
+    return Val_unit;
+}
+
+/* llvalue -> int -> string -> unit */
+CAMLprim value llvm_remove_callsite_string_attr(LLVMValueRef Arg, value Idx, value Key) {
+    mlsize_t len = caml_string_length(Key);
+    LLVMRemoveCallSiteStringAttribute(Arg, Int_val(Idx), String_val(Key), len);
+    return Val_unit;
 }
 
 /*--... Operations on call instructions (only) .............................--*/
